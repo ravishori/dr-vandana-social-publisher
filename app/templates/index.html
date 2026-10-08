@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dr. Vandana Social Publisher</title>
+<style>
+:root{font-family:Inter,Arial,sans-serif;color:#17202a;background:#f4f7f8}
+body{margin:0;padding:24px 14px}.shell{max-width:1050px;margin:auto}
+.card{background:#fff;padding:26px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.08);margin-bottom:18px}
+h1{margin:0 0 6px}.sub{color:#607080;margin-top:0}h3{margin-bottom:10px}
+textarea,input[type=url]{width:100%;box-sizing:border-box;padding:13px;border:1px solid #ccd5db;border-radius:10px;font:inherit}
+textarea{min-height:190px;resize:vertical}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+label.platform{border:1px solid #d9e1e5;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center}
+button{border:0;border-radius:10px;padding:12px 18px;margin:14px 8px 0 0;font-weight:700;cursor:pointer}
+.preview{background:#e9eef2}.publish{background:#216e4e;color:#fff}.secondary{background:#edf2f5}
+.status{margin-top:18px;padding:14px;border-radius:10px;background:#f7f9fa;white-space:pre-wrap;overflow:auto}
+.badge{display:inline-block;padding:5px 9px;border-radius:99px;background:#eef2f4;font-size:12px}
+.warn{margin-top:18px;padding:12px;background:#fff7df;border:1px solid #efd98a;border-radius:10px}
+.drop{border:2px dashed #c8d3da;border-radius:12px;padding:18px;text-align:center;margin-top:10px}
+.media-list{margin-top:10px}.media-item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 11px;border:1px solid #e0e6e9;border-radius:9px;margin:7px 0;font-size:14px}
+.small{font-size:13px;color:#687782}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:700px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="card">
+<span class="badge">Mode: {{ publish_mode }}</span>
+<h1>Dr. Vandana Social Publisher</h1>
+<p class="sub">Rich-content, controlled multi-platform publishing prototype.</p>
+
+<form id="publisherForm">
+<label><strong>Message / Caption</strong></label>
+<textarea id="message" maxlength="{{ max_message_length }}" placeholder="Write the caption or message to publish..."></textarea>
+
+<div class="row">
+<div>
+<h3>Website / external link</h3>
+<input id="link" type="url" placeholder="https://drvandana.trinetralab.net/blog/...">
+<p class="small">The link is appended to the published caption. Telegram supports its normal link preview.</p>
+</div>
+<div>
+<h3>Media</h3>
+<div class="drop">
+<input id="mediaFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,application/pdf" multiple>
+<p class="small">Images, videos and PDFs. Max {{ max_upload_size_mb }} MB per file.</p>
+</div>
+<div style="margin-top:10px">
+<input id="publicMediaUrl" type="url" placeholder="Optional public image/video URL">
+<select id="publicMediaKind" style="margin-top:7px;padding:10px;border:1px solid #ccd5db;border-radius:9px;font:inherit">
+<option value="image">Public image</option><option value="video">Public video</option>
+</select>
+<button type="button" class="secondary" onclick="addPublicMedia()">Add public media</button>
+<p class="small">Use a publicly reachable media URL for Facebook. Telegram local uploads are preferred.</p>
+</div>
+<div id="mediaList" class="media-list"></div>
+</div>
+</div>
+
+<h3>Distribution channels</h3>
+<div class="grid">
+<label class="platform"><input type="checkbox" value="facebook"> Facebook Page</label>
+<label class="platform"><input type="checkbox" value="telegram_channel" checked> Telegram Channel</label>
+<label class="platform"><input type="checkbox" value="telegram_group"> Telegram Group</label>
+<label class="platform"><input type="checkbox" value="whatsapp_channel"> WhatsApp Channel</label>
+<label class="platform"><input type="checkbox" value="whatsapp_group"> WhatsApp Group</label>
+</div>
+
+<button class="secondary" type="button" onclick="previewPost()">Preview</button>
+<button class="publish" type="submit">Publish Selected</button>
+</form>
+
+<div id="status" class="status">Ready.</div>
+<div class="warn"><strong>Prototype safety:</strong> keep this server on 127.0.0.1. Do not expose it publicly with provider credentials.</div>
+</div>
+</div>
+
+<script>
+let uploadedMedia=[];
+function selectedPlatforms(){return Array.from(document.querySelectorAll('.grid input:checked')).map(x=>x.value)}
+function payload(){return {message:document.getElementById('message').value,platforms:selectedPlatforms(),media:uploadedMedia.map(x=>({kind:x.kind,path:x.path||null,url:x.url||null,filename:x.filename})),link:document.getElementById('link').value||null}}
+function renderMedia(){
+ const box=document.getElementById('mediaList');
+ box.innerHTML=uploadedMedia.length?'':'<span class="small">No media selected.</span>';
+ uploadedMedia.forEach((m,i)=>{const d=document.createElement('div');d.className='media-item';d.innerHTML=`<span>${m.kind.toUpperCase()} — ${m.filename}</span><button type="button" class="secondary" onclick="removeMedia(${i})">Remove</button>`;box.appendChild(d)})
+}
+function removeMedia(i){uploadedMedia.splice(i,1);renderMedia()}
+function addPublicMedia(){
+ const url=document.getElementById('publicMediaUrl').value.trim();
+ const kind=document.getElementById('publicMediaKind').value;
+ const status=document.getElementById('status');
+ if(!url){status.textContent='Enter a public media URL first.';return}
+ try{new URL(url)}catch(e){status.textContent='Enter a valid public media URL.';return}
+ uploadedMedia.push({kind,url,filename:url.split('/').pop()||url,path:null});
+ document.getElementById('publicMediaUrl').value='';
+ renderMedia();
+}
+async function uploadFiles(files){
+ const status=document.getElementById('status');
+ for(const file of files){
+  status.textContent=`Uploading ${file.name}...`;
+  const form=new FormData();form.append('file',file);
+  try{const r=await fetch('/api/media/upload',{method:'POST',body:form});const data=await r.json();if(!data.success){status.textContent=data.error;continue}uploadedMedia.push(data.media);renderMedia()}
+  catch(err){status.textContent='Upload failed: '+err}
+ }
+ status.textContent='Media ready.';
+}
+document.getElementById('mediaFiles').addEventListener('change',e=>uploadFiles(Array.from(e.target.files)));
+async function previewPost(){
+ const data=payload(),status=document.getElementById('status');
+ if(!data.message.trim()&&!data.media.length&&!data.link){status.textContent='Add text, a link, or media first.';return}
+ if(!data.platforms.length){status.textContent='Select at least one platform.';return}
+ const r=await fetch('/api/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});status.textContent=JSON.stringify(await r.json(),null,2)
+}
+document.getElementById('publisherForm').addEventListener('submit',async e=>{
+ e.preventDefault();const data=payload(),status=document.getElementById('status');
+ if(!data.message.trim()&&!data.media.length&&!data.link){status.textContent='Add text, a link, or media first.';return}
+ if(!data.platforms.length){status.textContent='Select at least one platform.';return}
+ status.textContent='Publishing...';
+ try{const r=await fetch('/api/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});status.textContent=JSON.stringify(await r.json(),null,2)}catch(err){status.textContent='Request failed: '+err}
+});
+renderMedia();
+</script>
+</body>
+</html>
